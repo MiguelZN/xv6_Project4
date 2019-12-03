@@ -407,8 +407,6 @@ void scheduler(void)
     //Checks for the queue numbers 
     for(p= ptable.proc;p<&ptable.proc[NPROC];p++){
       if(p->queue_num==highest_queue && p->state==RUNNABLE){
-        //p->rem_iter-=1; //CPU Burst if process is in highest queue
-
 
         // Switch to chosen process.  It is the process's job
         // to release ptable.lock and then reacquire it
@@ -419,7 +417,8 @@ void scheduler(void)
         p->state = RUNNING;
 
         //Runs this current process for its entire CPU burst
-        for(p->rem_iter;p->rem_iter>0;p->rem_iter-=1){
+        for(int k =p->rem_iter;k>0;k-=1){
+          p->rem_iter-=1; //Runs CPU Burst for 1 iteration
           cprintf("process [%s:%d] is running\n", p->name, p->pid);
 
           //While the highest priority queue process is running, all processes that are NOT running, their idle count is increasing per iteration
@@ -475,7 +474,7 @@ void scheduler(void)
               p->idle_count= 0;
               break;
             default:
-              printf("Queue number was not 3,2,1, or 0\n");
+              cprintf("Queue number was not 3,2,1, or 0\n");
               break;
             }
         }
