@@ -354,6 +354,7 @@ void scheduler(void)
   
   for (;;)
   {
+//    cprintf("RUNNING\n");
     // Enable interrupts on this processor.
     sti();
 
@@ -406,29 +407,39 @@ void scheduler(void)
       }
     }
 
+
     //Checks for the queue numbers 
     for(p= ptable.proc;p<&ptable.proc[NPROC];p++){
+//      cprintf("Looping through processes\n");
+/*      if(p->queue_num==highest_queue){
+        c->proc=p;
+        switchuvm(p);
+        p->state = RUNNING;
+        }*/
       if(p->queue_num==highest_queue && p->state==RUNNABLE){
 
         // Switch to chosen process.  It is the process's job
         // to release ptable.lock and then reacquire it
         // before jumping back to us.
-        c->proc = p;
+         c->proc = p;
 
         switchuvm(p);
         p->state = RUNNING;
-
+        
+        
         //Runs this current process for its entire CPU burst
         for(int k =p->rem_iter;k>0;k-=1){
           p->rem_iter-=1; //Runs CPU Burst for 1 iteration
           //cprintf("process [%s:%d] is running\n", p->name, p->pid);
           cprintf("process %s|pid %d|Queue %d|Remaining Iter %d|Idle Count %d is running\n", p->name, p->pid, p->queue_num, p->rem_iter, p->idle_count);
-          cprintf("Number of Processes:%d", &num_processes)
+//          cprintf("Number of Processes:%d", num_processes);
 
           //While the highest priority queue process is running, all processes that are NOT running, their idle count is increasing per iteration
           for(struct proc *temp= ptable.proc;temp<&ptable.proc[NPROC];temp++){
+            
             if(temp->state!=RUNNABLE){
-              temp->idle_count+=1; 
+              temp->idle_count+=1;
+              cprintf("Process %s is NOT running, idle count %d\n",p->name, p->idle_count);
 
               if(highest_queue==3 && temp->idle_count>QUEUE3_ITERATIONS){
                 temp->idle_count = 0;
