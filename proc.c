@@ -420,6 +420,7 @@ void scheduler(void)
         for(int k =p->rem_iter;k>0;k-=1){
           p->rem_iter-=1; //Runs CPU Burst for 1 iteration
           cprintf("process [%s:%d] is running\n", p->name, p->pid);
+          cprintf("process %s|pid %d|Queue %d|Remaining Iter %d|Idle Count %d is running\n", p->name, p->pid, p->queue_num, p->rem_iter, p->idle_count);
 
           //While the highest priority queue process is running, all processes that are NOT running, their idle count is increasing per iteration
           for(struct proc *temp= ptable.proc;temp<&ptable.proc[NPROC];temp++){
