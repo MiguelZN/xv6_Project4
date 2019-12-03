@@ -49,6 +49,11 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  
+  //Project4: CISC361
+  int queue_num; //the queue number
+  int rem_iter; //remaining iterations
+  int idle_count; //Count of iterations since the process last ran
 };
 
 // Process memory is laid out contiguously, low addresses first:
