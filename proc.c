@@ -350,6 +350,7 @@ void scheduler(void)
 
   //struct proc *highest_queue_p = NULL; //keeps track of the process with the highest queue number
   int highest_queue = -1;
+  int num_processes =0;
   
   for (;;)
   {
@@ -399,6 +400,7 @@ void scheduler(void)
 
     //Finds the highest queue
     for(p= ptable.proc;p<&ptable.proc[NPROC];p++){
+      num_processes+=1;
       if(p->queue_num>highest_queue){
         highest_queue = p->queue_num;
       }
@@ -419,8 +421,9 @@ void scheduler(void)
         //Runs this current process for its entire CPU burst
         for(int k =p->rem_iter;k>0;k-=1){
           p->rem_iter-=1; //Runs CPU Burst for 1 iteration
-          cprintf("process [%s:%d] is running\n", p->name, p->pid);
+          //cprintf("process [%s:%d] is running\n", p->name, p->pid);
           cprintf("process %s|pid %d|Queue %d|Remaining Iter %d|Idle Count %d is running\n", p->name, p->pid, p->queue_num, p->rem_iter, p->idle_count);
+          cprintf("Number of Processes:%d", &num_processes)
 
           //While the highest priority queue process is running, all processes that are NOT running, their idle count is increasing per iteration
           for(struct proc *temp= ptable.proc;temp<&ptable.proc[NPROC];temp++){
@@ -450,7 +453,7 @@ void scheduler(void)
         }
 
         //Once highest process' remaining iteration is <= 0, lowers its queue
-        if(p->rem_iter<0){
+        if(p->rem_iter<=0){
           p->queue_num-=1; 
 
           if(p->queue_num<0){
