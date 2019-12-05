@@ -344,10 +344,7 @@ int wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
-#define QUEUE0MAX 500
-#define QUEUE1MAX 8
-#define QUEUE2MAX 16
-#define QUEUE3MAX 24
+
 
 void scheduler(void)
 {
@@ -361,85 +358,91 @@ void scheduler(void)
     sti();
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    {
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       int highest_queue = 0;
-      for (struct proc *tmp = ptable.proc; tmp < &ptable.proc[NPROC]; tmp++)
-      {
-        switch (tmp->queue_num)
-        {
-        case 0:
-          if (tmp->rem_iter <= 0) // queue_num 0 processes stays in queue_num 0
-          {
-            tmp->queue_num = 0;
-            tmp->rem_iter = QUEUE0MAX;
-            tmp->idle_count = 0;
-          }
-          if (tmp->idle_count > QUEUE0MAX) // queue 0 move to queue 1
-          {
-            tmp->queue_num = 1;
-            tmp->rem_iter = QUEUE1MAX;
-            tmp->idle_count = 0;
-          }
-          break;
-        case 1:
-          if (tmp->rem_iter <= 0) // queue 1 moves down to queue 0
-          {
-            tmp->queue_num = 0;
-            tmp->rem_iter = QUEUE0MAX;
-            tmp->idle_count = 0;
-          }
-          if (tmp->idle_count > QUEUE1MAX) // queue 1 moves up to queue 2
-          {
-            tmp->queue_num = 2;
-            tmp->rem_iter = QUEUE2MAX;
-            tmp->idle_count = 0;
-          }
-          break;
-        case 2:
-          if (tmp->rem_iter <= 0) // queue 2 moves down to queue 1
-          {
-            tmp->queue_num = 1;
-            tmp->rem_iter = QUEUE1MAX;
-            tmp->idle_count = 0;
-          }
-          if (tmp->idle_count > QUEUE2MAX) // queue 2 moves up to queue 3
-          {
-            tmp->queue_num = 3;
-            tmp->rem_iter = QUEUE3MAX;
-            tmp->idle_count = 0;
-          }
-          break;
-        case 3:
-          if (tmp->rem_iter <= 0) // queue 3 moves down to queue 2
-          {
-            tmp->queue_num = 2;
-            tmp->rem_iter = QUEUE2MAX;
-            tmp->idle_count = 0;
-          }
-          break;
-        default:
-          break;
+
+      for (struct proc *temp = ptable.proc; temp < &ptable.proc[NPROC]; temp++){
+        if(temp->state!=RUNNABLE){
+          continue;
         }
 
-        if (tmp->queue_num > highest_queue && tmp->state == RUNNABLE) // check for the highest queue #
+        //Finds the highest Queue number
+        if (temp->queue_num > highest_queue && temp->state == RUNNABLE) 
         {
-          highest_queue = tmp->queue_num;
+          highest_queue = temp->queue_num;
         }
+
+
+            //Keeps the Queues within [0,3]
+            if(temp->queue_num<0){
+                  temp->queue_num = 0;
+            }
+            else if(temp->queue_num>3){
+              temp->queue_num=3;
+            }
+
+            //Raising the Queues
+            //QUEUE 0 
+            if(temp->queue_num==0 && temp->idle_count>QUEUE0_ITERATIONS){
+              temp->queue_num = 1; 
+              temp->idle_count = 0;
+              temp->rem_iter = QUEUE1_ITERATIONS;
+            }
+            //QUEUE 1 
+            else if(temp->queue_num==1 && temp->idle_count>QUEUE1_ITERATIONS){
+              temp->queue_num = 2;
+              temp->idle_count = 0;
+              temp->rem_iter = QUEUE2_ITERATIONS;
+            }
+            //QUEUE 2 
+            else if(temp->queue_num==2 && temp->idle_count>QUEUE2_ITERATIONS){
+              temp->queue_num = 3;
+              temp->idle_count = 0;
+              temp->rem_iter = QUEUE3_ITERATIONS;
+            }
+            //QUEUE 3 
+            else if(temp->queue_num==3 && temp->idle_count>QUEUE3_ITERATIONS){
+              temp->queue_num = 3;
+              temp->idle_count = 0;
+              temp->rem_iter = QUEUE3_ITERATIONS;
+            
+          }
+          
+          //Lowers the Queue
+            if(temp->rem_iter<=0){
+                temp->queue_num-=1; 
+                temp->idle_count = 0;
+
+                //Resets the Queue 0 to be 0
+                if(temp->queue_num<0){
+                  temp->queue_num = 0;
+                }
+
+                //cprintf("ITERATIONS:%d\n", temp->rem_iter);
+                switch(temp->queue_num){
+                  case 3:
+                    temp->rem_iter = QUEUE3_ITERATIONS;
+                    break;
+                  case 2:
+                    temp->rem_iter = QUEUE2_ITERATIONS;
+                   break;
+                  case 1:
+                    temp->rem_iter = QUEUE1_ITERATIONS;
+                   break;
+                  case 0:
+                    temp->rem_iter = QUEUE0_ITERATIONS;
+                   break;
+                }
+            }
       }
 
-      if (p->state != RUNNABLE || p->queue_num < highest_queue)
-        continue;
-
-      if (p->state == RUNNABLE && p->queue_num == highest_queue)
-      {
-        for (struct proc *tmp2 = ptable.proc; tmp2 < &ptable.proc[NPROC]; tmp2++)
-        {
-          tmp2->idle_count++;
-        }
-        cprintf("process [%s:%d queue:%d idle:%d iterations:%d]\n", p->name, p->pid, p->queue_num, p->idle_count * 10, p->rem_iter * 10);
+      if (p->state == RUNNABLE && p->queue_num == highest_queue){
+        //Increments the idle counts for every processes
+      for (struct proc *incr = ptable.proc; incr < &ptable.proc[NPROC]; incr++){
+          incr->idle_count+=1;}
+        cprintf("process [%s:%d] is running|Queue %d|Iterations %d|Idle %d\n", p->name, p->pid, p->queue_num, p->rem_iter, p->idle_count);
         p->idle_count = 0;
-        p->rem_iter--;
+        p->rem_iter-=1;
 
         c->proc = p;
         switchuvm(p);
