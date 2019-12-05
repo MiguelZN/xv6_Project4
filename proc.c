@@ -344,151 +344,120 @@ int wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
+#define QUEUE0MAX 500
+#define QUEUE1MAX 8
+#define QUEUE2MAX 16
+#define QUEUE3MAX 24
+
 void scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
 
-  //struct proc *highest_queue_p = NULL; //keeps track of the process with the highest queue number
-  int highest_queue = -1;
-
   for (;;)
   {
+    // Enable interrupts on this processor.
     sti();
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    {
+      int highest_queue = 0;
+      for (struct proc *tmp = ptable.proc; tmp < &ptable.proc[NPROC]; tmp++)
+      {
+        switch (tmp->queue_num)
+        {
+        case 0:
+          if (tmp->rem_iter <= 0) // queue_num 0 processes stays in queue_num 0
+          {
+            tmp->queue_num = 0;
+            tmp->rem_iter = QUEUE0MAX;
+            tmp->idle_count = 0;
+          }
+          if (tmp->idle_count > QUEUE0MAX) // queue 0 move to queue 1
+          {
+            tmp->queue_num = 1;
+            tmp->rem_iter = QUEUE1MAX;
+            tmp->idle_count = 0;
+          }
+          break;
+        case 1:
+          if (tmp->rem_iter <= 0) // queue 1 moves down to queue 0
+          {
+            tmp->queue_num = 0;
+            tmp->rem_iter = QUEUE0MAX;
+            tmp->idle_count = 0;
+          }
+          if (tmp->idle_count > QUEUE1MAX) // queue 1 moves up to queue 2
+          {
+            tmp->queue_num = 2;
+            tmp->rem_iter = QUEUE2MAX;
+            tmp->idle_count = 0;
+          }
+          break;
+        case 2:
+          if (tmp->rem_iter <= 0) // queue 2 moves down to queue 1
+          {
+            tmp->queue_num = 1;
+            tmp->rem_iter = QUEUE1MAX;
+            tmp->idle_count = 0;
+          }
+          if (tmp->idle_count > QUEUE2MAX) // queue 2 moves up to queue 3
+          {
+            tmp->queue_num = 3;
+            tmp->rem_iter = QUEUE3MAX;
+            tmp->idle_count = 0;
+          }
+          break;
+        case 3:
+          if (tmp->rem_iter <= 0) // queue 3 moves down to queue 2
+          {
+            tmp->queue_num = 2;
+            tmp->rem_iter = QUEUE2MAX;
+            tmp->idle_count = 0;
+          }
+          break;
+        default:
+          break;
+        }
 
-      //Finds the highest queue
-      for(p= ptable.proc;p<&ptable.proc[NPROC];p++){
-        if(p->queue_num>highest_queue){
-          highest_queue = p->queue_num;
+        if (tmp->queue_num > highest_queue && tmp->state == RUNNABLE) // check for the highest queue #
+        {
+          highest_queue = tmp->queue_num;
         }
       }
 
-
-for (p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-
-      
-      if (p->state != RUNNABLE){
-
-        p->idle_count+=1;
-            cprintf("process %s|pid %d|Queue %d|Remaining Iter %d|Idle Count %d is NOT running\n", p->name, p->pid, p->queue_num, p->rem_iter, p->idle_count);
-            
-          
-
-            if(highest_queue==3 && p->idle_count>QUEUE3_ITERATIONS){
-              //cprintf("ENTERING QUEUE3\n");
-              p->idle_count = 0;
-              p->queue_num+=1; 
-
-              if(p->queue_num>3){
-                p->queue_num = 3;
-              }
-            }
-            else if(highest_queue==2 && p->idle_count>QUEUE2_ITERATIONS){
-              //cprintf("ENTERING QUEUE2\n");
-              p->idle_count = 0;
-              p->queue_num+=1;
-            }
-            else if(highest_queue==1 && p->idle_count>QUEUE1_ITERATIONS){
-              //cprintf("ENTERING QUEUE1\n");
-              p->idle_count = 0;
-              p->queue_num+=1;
-            }
-            else if(highest_queue==0 && p->idle_count>QUEUE0_ITERATIONS){
-              //cprintf("ENTERING QUEUE0\n");
-              p->idle_count = 0;
-              p->queue_num+=1;
-            }
+      if (p->state != RUNNABLE || p->queue_num < highest_queue)
         continue;
-      }
-      
-      if(p->queue_num==highest_queue){
-        cprintf("process [%s:%d] is running\n", p->name, p->pid);
-        // Switch to chosen process.  It is the process's job
-        // to release ptable.lock and then reacquire it
-        // before jumping back to us.
-        c->proc = p;
 
+      if (p->state == RUNNABLE && p->queue_num == highest_queue)
+      {
+        for (struct proc *tmp2 = ptable.proc; tmp2 < &ptable.proc[NPROC]; tmp2++)
+        {
+          tmp2->idle_count++;
+        }
+        cprintf("process [%s:%d queue:%d idle:%d iterations:%d]\n", p->name, p->pid, p->queue_num, p->idle_count * 10, p->rem_iter * 10);
+        p->idle_count = 0;
+        p->rem_iter--;
+
+        c->proc = p;
         switchuvm(p);
         p->state = RUNNING;
-
-        p->rem_iter-=1;
-
         swtch(&(c->scheduler), p->context);
         switchkvm();
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
+        
         c->proc = 0;
-
-        if(p->rem_iter<=0){
-          p->queue_num-=1; 
-
-          if(p->queue_num<0){
-            p->queue_num=0;
-          }
-
-          switch(p->queue_num){
-            case 3:
-              p->rem_iter = 8;
-              p->idle_count= 0;
-              break;
-            case 2:
-              p->rem_iter = 16;
-              p->idle_count= 0;
-              break;
-            case 1: 
-              p->rem_iter = 24;
-              p->idle_count= 0;
-              break;
-            case 0:
-              p-> rem_iter = 50;
-              p->idle_count= 0;
-              break;
-            default:
-              cprintf("Queue number was not 3,2,1, or 0\n");
-              break;
-            }
-        }
       }
+      
     }
-
     release(&ptable.lock);
-
   }
 }
 
-/*
-for (p = ptable.proc; p < &ptable.proc[NPROC]; p++){
 
-      
-      if (p->state != RUNNABLE)
-        continue;
-      
 
-      cprintf("process [%s:%d] is running\n", p->name, p->pid);
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
 
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-    }
-
-    release(&ptable.lock);
-
-  }
-  */
 
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state. Saves and restores
